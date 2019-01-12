@@ -53,14 +53,17 @@ object ScalaSigParser {
   def scalaSigFromAttribute(classFile: ClassFile): Option[ScalaSig] =
     classFile.attribute(SCALA_SIG).map(_.byteCode).map(ScalaSigAttributeParsers.parse)
 
-  def parse(classFile: ClassFile): Option[ScalaSig] = {
+  def parse(classFile: ClassFile, extraVerbose: Boolean = false): Option[ScalaSig] = {
     val scalaSig  = scalaSigFromAttribute(classFile)
 
     scalaSig match {
       // No entries in ScalaSig attribute implies that the signature is stored in the annotation
       case Some(ScalaSig(_, _, entries)) if entries.length == 0 =>
+        if(extraVerbose) Console println "ScalaSig from annotation."
         scalaSigFromAnnotation(classFile)
-      case x => x
+      case x =>
+        if(extraVerbose) Console println "ScalaSig from attribute"
+        x
     }
   }
 

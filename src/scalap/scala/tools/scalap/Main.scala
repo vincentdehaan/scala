@@ -38,6 +38,7 @@ class Main {
   /**Verbose program run?
    */
   var verbose = false
+  var extraVerbose = false
   var printPrivates = false
 
   def isScalaFile(bytes: Array[Byte]): Boolean = {
@@ -86,7 +87,19 @@ class Main {
     }
     // Print classes
     val printer = new ScalaSigPrinter(stream, printPrivates)
-    syms foreach (printer printSymbol _)
+    syms foreach {
+      sym => {
+        if(extraVerbose) {
+          Console println s"Printing symbol $sym."
+          sym match {
+            case s : ObjectSymbol => {
+              Console println s"Flags: ${sym.flags.filter(_._2).keySet.mkString(",")}"
+            }
+          }
+        }
+        printer.printSymbol(sym, extraVerbose)
+      }
+    }
     baos.toString
   }
 
@@ -94,7 +107,7 @@ class Main {
     val byteCode = ByteCode(bytes)
     val classFile = ClassFileParser.parse(byteCode)
 
-    ScalaSigParser.parse(classFile) match {
+    ScalaSigParser.parse(classFile, extraVerbose) match {
       case Some(scalaSig) => parseScalaSignature(scalaSig, isPackageObject)
       case None           => ""
     }
@@ -104,6 +117,7 @@ class Main {
    *  class denoted by `classname`.
    */
   def process(args: Arguments, path: ClassPath)(classname: String): Unit = {
+    if(extraVerbose) Console println s"Processing $classname."
     // find the classfile
     val encName = classname match {
       case "scala.AnyRef" => "java.lang.Object"
@@ -121,8 +135,10 @@ class Main {
         }
         val bytes = classFile.toByteArray
         if (isScalaFile(bytes)) {
+          if(extraVerbose) Console println s"$classname is a Scala class."
           Console.println(decompileScala(bytes, isPackageObjectFile(encName)))
         } else {
+          if(extraVerbose) Console println s"$classname is a Java class."
           // construct a reader for the classfile content
           val reader = new ByteArrayReader(classFile.toByteArray)
           // parse the classfile
@@ -145,6 +161,7 @@ object Main extends Main {
     val classpath = "-classpath"
     val showPrivateDefs = "-private"
     val verbose = "-verbose"
+    val extraVerbose = "-extraVerbose"
     val version = "-version"
 
     val disableFlatClassPathCaching = "-YdisableFlatCpCaching"
@@ -159,6 +176,7 @@ object Main extends Main {
       |and <option> is
       |  ${opts.showPrivateDefs}           print private definitions
       |  ${opts.verbose}           print out additional information
+      |  ${opts.extraVerbose}      print out very much additional information
       |  ${opts.version}           print out the version number of scalap
       |  ${opts.help}              display this usage message
       |  ${opts.classpath} <path>  specify where to find user class files
@@ -178,6 +196,8 @@ object Main extends Main {
         usage()
 
       verbose = arguments contains opts.verbose
+      extraVerbose = arguments contains opts.extraVerbose
+      if(extraVerbose) Console println "Scalap is in extra verbose mode"
       printPrivates = arguments contains opts.showPrivateDefs
       // construct a custom class path
       val cpArg = List(opts.classpath, opts.cp) map arguments.getArgument reduceLeft (_ orElse _)
@@ -195,6 +215,7 @@ object Main extends Main {
           Console.println(BOLD + "CLASSPATH" + RESET + " = " + path.asClassPathString)
 
         // process all given classes
+        if(extraVerbose) Console println s"Found ${arguments.getOthers.size} classes to decompile: ${arguments.getOthers.mkString(",")}."
         arguments.getOthers foreach process(arguments, path)
       } finally {
         registry.close()
@@ -205,6 +226,7 @@ object Main extends Main {
     Arguments.Parser('-')
       .withOption(opts.showPrivateDefs)
       .withOption(opts.verbose)
+      .withOption(opts.extraVerbose)
       .withOption(opts.version)
       .withOption(opts.help)
       .withOptionalArg(opts.classpath)

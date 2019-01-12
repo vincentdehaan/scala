@@ -27,7 +27,7 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
 
   case class TypeFlags(printRep: Boolean)
 
-  def printSymbol(symbol: Symbol): Unit = {printSymbol(0, symbol)}
+  def printSymbol(symbol: Symbol, extraVerbose: Boolean): Unit = {printSymbol(0, symbol, extraVerbose)}
 
   def printSymbolAttributes(s: Symbol, onNewLine: Boolean, indent: => Unit) = s match {
     case t: SymbolInfoSymbol => {
@@ -39,12 +39,14 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
     case _ =>
   }
 
-  def printSymbol(level: Int, symbol: Symbol): Unit = {
+  def printSymbol(level: Int, symbol: Symbol, extraVerbose: Boolean = false): Unit = {
     if (!symbol.isLocal &&
             !(symbol.isPrivate && !printPrivates)) {
       def indent(): Unit = {for (i <- 1 to level) print("  ")}
 
       printSymbolAttributes(symbol, true, indent)
+
+      Console println s"Printing symbol $symbol."
       symbol match {
         case o: ObjectSymbol =>
           if (!isCaseClassObject(o)) {
@@ -60,7 +62,8 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
           indent
           printClass(level, c)
         case m: MethodSymbol =>
-          printMethod(level, m, () => indent())
+          Console println s"Flags: ${m.flags.filter(_._2).keySet.mkString(",")}"
+          printMethod(level, m, () => indent(), extraVerbose)
         case a: AliasSymbol =>
           indent
           printAlias(level, a)
@@ -230,7 +233,7 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
     cont
   }
 
-  def printMethod(level: Int, m: MethodSymbol, indent: () => Unit): Unit = {
+  def printMethod(level: Int, m: MethodSymbol, indent: () => Unit, extraVerbose: Boolean = false): Unit = {
     def cont() = print(" = { /* compiled code */ }")
 
     val n = m.name
