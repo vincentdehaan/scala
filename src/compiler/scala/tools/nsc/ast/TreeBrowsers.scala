@@ -15,15 +15,15 @@ package tools.nsc
 package ast
 
 import scala.language.implicitConversions
-
 import java.awt.{List => _, _}
 import java.awt.event._
 import java.io.{StringWriter, Writer}
+
 import javax.swing._
 import javax.swing.event.TreeModelListener
 import javax.swing.tree._
-
 import java.util.concurrent.locks._
+
 import scala.annotation.tailrec
 
 /**
@@ -71,7 +71,36 @@ abstract class TreeBrowsers {
       val frame = new BrowserFrame(pName)
       frame.setTreeModel(tm)
 
-      val lock = new ReentrantLock()
+      class ReentrantLockWithHandler extends ReentrantLock {
+        def printStacktrace = {
+          val ex = new Exception
+          println(ex.getStackTrace.mkString("\n"))
+        }
+
+        override def lock = {
+          println(s"Locked: ${this.toString}")
+          printStacktrace
+          super.lock()
+        }
+
+        override def unlock = {
+          println(s"Unlocked: ${this.toString}")
+          printStacktrace
+          super.unlock()
+        }
+      }
+
+      val lock2 = new ReentrantLockWithHandler()
+      println(222)
+      lock2.lock
+      println(123)
+      lock2.lock
+      println(456)
+      lock2.lock
+      println(567)
+
+
+      val lock = new ReentrantLockWithHandler()
       frame.createFrame(lock)
 
       // wait for the frame to be closed
@@ -177,12 +206,16 @@ abstract class TreeBrowsers {
      */
     def createFrame(lock: Lock): Unit = {
       lock.lock() // keep the lock until the user closes the window
-
+println("180 " + lock.toString())
       frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE)
 
       frame.addWindowListener(new WindowAdapter() {
         /** Release the lock, so compilation may resume after the window is closed. */
-        override def windowClosed(e: WindowEvent): Unit = lock.unlock()
+        override def windowClosed(e: WindowEvent): Unit = {
+
+          lock.unlock()
+          println("189 " + lock.toString())
+        }
       })
 
       jTree = new JTree(treeModel) {
